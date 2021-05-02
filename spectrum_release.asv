@@ -6,7 +6,7 @@ classdef spectrum_release < audioPlugin
        x_buff = zeros(4096,2);  %入力バッファ
        y_buff = zeros(4096,2);  %出力バッファ
        spectrum_buff = zeros(2048,2);
-       coeff = 0;
+       coeff = 1;
     
     end
     
@@ -42,12 +42,10 @@ classdef spectrum_release < audioPlugin
                 p.x_buff(p.n,:) = x_frame(i,:);
                 y_frame(i,:) = p.y_buff(max(1,p.n-p.n_fft/2),:);
                 p.n = p.n + 1;
-
              %% バッファが十分に満たされたら
                if p.n == p.n_fft
                     %FFTして負の周波数を無視
-                    
-                    x_fft_allfreq = fft(p.x_buff,p.n_fft);
+                    x_fft_allfreq = fft(p.x_buff+fft(rand(p.n_fft/2,2)),p.n_fft);
                     x_fft = x_fft_allfreq(1:end/2,:).*2;
                     
                     %入力バッフアをずらす
@@ -57,8 +55,9 @@ classdef spectrum_release < audioPlugin
                     %信号処理部
                     
                     amp = abs(x_fft);
-                    phase = x_fft./amp;
-
+                    
+                    phase = nz_fft./amp(nz_fft);
+                    
                     p.spectrum_buff = max(amp,p.spectrum_buff.*p.coeff/100);
                     
                     y_fft = p.spectrum_buff.*phase;
