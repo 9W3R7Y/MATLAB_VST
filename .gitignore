@@ -1,6 +1,5 @@
 *.wav
 *.reapeaks
-*/audioplugin/*
-*/Builds/*
-*/JuceLibraryCode/*
-*/codegen/*
+/Builds/*
+/JuceLibraryCode/*
+/codegen/*
