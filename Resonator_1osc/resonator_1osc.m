@@ -11,8 +11,11 @@ classdef resonator_1osc < audioPlugin
        s_amp = 0.01;
        f = 110;
        
-       spectrum_buff = zeros(2048,2);
+       spectrum_buff = zeros(4096/2,2);
        coeff = 0;
+       bins = 256;
+       color = 1;
+       amp_db = 0;
     
     end
     
@@ -23,22 +26,38 @@ classdef resonator_1osc < audioPlugin
                 audioPluginParameter('coeff', ...
                 'DisplayName', 'Delay', ...
                 'Label', '%', ...
-                'Mapping', { 'pow', 2, 0, 100}),...
+                'Mapping', { 'pow', 10, 0, 100}),...
                 ...
                 audioPluginParameter('f', ...
                 'DisplayName', 'Freq', ...
                 'Label', 'Hz', ...
-                'Mapping', { 'log', 20, 2000}))
+                'Mapping', { 'log', 20, 2000}),...
+                ...
+                audioPluginParameter('bins', ...
+                'DisplayName', 'Harmonics', ...
+                'Label', '', ...
+                'Mapping', { 'lin', 1, 256}),...
+                ...
+                audioPluginParameter('color', ...
+                'DisplayName', 'Color', ...
+                'Label', '', ...
+                'Mapping', { 'lin', 0, 1}),...
+                ...
+                audioPluginParameter('amp_db', ...
+                'DisplayName', 'Amp', ...
+                'Label', '', ...
+                'Mapping', { 'lin', -40, 0}))
     end
     
     %%パラメタの設定
     properties(Constant)
         n_fft       = 4096;     %fft幅
-        n_shift     =  32;      %シフト幅
+        n_shift     =   64;      %シフト幅
     end
     
     %% メソッド
     methods
+            
         function y_frame = process(p, x_frame)
           %% ループの準備
             %フレームサイズの取得
@@ -50,15 +69,30 @@ classdef resonator_1osc < audioPlugin
             %出力フレームの用意
             y_frame = zeros(frame_size,2);
             
+            %% オシレーターの関数
+            function y = series2wave(x,N,Phi,color,freq)
+                n_bin = length(N);
+                y = 0;
+                for i_bin = 1:n_bin
+                    if freq * N(i_bin) < Fs/2
+                        y = y + sin(N(i_bin)*x+Phi(i_bin)).*(1/N(i_bin))^color;
+                    else
+                        break
+                    end
+                end
+            end
+            
           %% メインループ
             for i = 1:frame_size
                 %OSCを進める
                 p.s = mod(p.s + p.f/Fs, 1);
-                p.s_buff(p.n,:) = (2*p.s-1)*p.s_amp;
+                N = 1:p.bins;
+                Phi = zeros(size(N));
+                p.s_buff(p.n,:) = series2wave(2*pi*(2*p.s-1),N,Phi,1-p.color,p.f)*p.s_amp;
                 
               %% バッファの入出力とステップの進行
                 p.x_buff(p.n,:) = x_frame(i,:);
-                y_frame(i,:) = p.y_buff(max(1,p.n-p.n_fft/2),:);
+                y_frame(i,:) = p.y_buff(max(1,p.n-p.n_fft/2),:).*10^(p.amp_db/20);
                 p.n = p.n + 1;
 
              %% バッファが十分に満たされたら
@@ -101,9 +135,8 @@ classdef resonator_1osc < audioPlugin
             p.y_buff = zeros(p.n_fft,2);
             p.s_buff = zeros(p.n_fft,2);
             p.s = 0;
-            p.s_amp = 0.01;
-            p.f = 110;
             p.spectrum_buff = zeros(p.n_fft/2,2);
         end
+
     end
 end
