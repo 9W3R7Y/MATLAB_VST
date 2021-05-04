@@ -1,4 +1,4 @@
-classdef Infinate_Reverb < audioPlugin
+classdef Infinite_Reverb < audioPlugin
     %#codegen
     %% 変数の作成
     properties
@@ -15,7 +15,7 @@ classdef Infinate_Reverb < audioPlugin
        sustain = 1
        low = 1;
        high = 1;
-       init_sustain = 0;
+       init_att = 0;
     
     end
     
@@ -35,8 +35,8 @@ classdef Infinate_Reverb < audioPlugin
                 'DisplayName', 'Sustain (High Freq)', ...
                 'Label', '%/s', ...
                 'Mapping', { 'lin', 0, 1}), ...
-                audioPluginParameter('init_sustain', ...
-                'DisplayName', 'Initial sustain', ...
+                audioPluginParameter('init_att', ...
+                'DisplayName', 'Initial Attenuation', ...
                 'Label', '', ...
                 'Mapping', { 'lin', 0, 10}), ...
                 audioPluginParameter('amp_db', ...
@@ -99,7 +99,7 @@ classdef Infinate_Reverb < audioPlugin
                     
                     sustain_coeff = [sustain_coeff_mono sustain_coeff_mono];
                     
-                    p.spectrum_buff = max(amp.*(sustain_coeff).^p.init_sustain,p.spectrum_buff.*((sustain_coeff*p.sustain).^(p.n_shift/Fs)));
+                    p.spectrum_buff = max(amp.*(sustain_coeff).^p.init_att,p.spectrum_buff.*((sustain_coeff*p.sustain).^(p.n_shift/Fs)));
                     
                     y_fft = p.spectrum_buff.*s_fft;
                     
