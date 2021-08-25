@@ -3,13 +3,13 @@ classdef Infinite_Reverb < audioPlugin
     %% 変数の作成
     properties
        n = 0;                   %位置
-       x_buff = zeros(8192,2);  %入力バッファ
-       y_buff = zeros(8192,2);  %出力バッファ
+       x_buff = zeros(4096,2);  %入力バッファ
+       y_buff = zeros(4096,2);  %出力バッファ
        
-       s_buff = zeros(8192,2); %オシレーターバッフア
+       s_buff = zeros(4096,2); %オシレーターバッフア
        s = 0;
        
-       spectrum_buff = zeros(8192/2,2);
+       spectrum_buff = zeros(4096/2,2);
        amp_db = 0;
        
        sustain = 1
@@ -47,8 +47,8 @@ classdef Infinite_Reverb < audioPlugin
     
     %%パラメタの設定
     properties(Constant)
-        n_fft       = 8192;     %fft幅
-        n_shift     =  128;      %シフト幅
+        n_fft       = 4096;     %fft幅
+        n_shift     =  256;      %シフト幅
     end
     
     %% メソッド

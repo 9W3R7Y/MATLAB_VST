@@ -137,6 +137,5 @@ classdef resonator_1osc < audioPlugin
             p.s = 0;
             p.spectrum_buff = zeros(p.n_fft/2,2);
         end
-
     end
 end
