@@ -30,11 +30,9 @@ classdef DC_Offset_Remover < audioPlugin
             Fs =  getSampleRate(p);
             
             for i = 1:length(in)
-            %% Shift Buffer
                 p.buff(2:end,:) = p.buff(1:end-1,:);
                 p.buff(1,:) = in(i,:);
                 
-            %% Calc 
                 L = p.buff(1:p.n_Samples,1);
                 R = p.buff(1:p.n_Samples,2);
                 
