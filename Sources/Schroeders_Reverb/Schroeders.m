@@ -67,7 +67,7 @@ classdef Schroeders < audioPlugin
         end
         
         %% comb filter
-        function [Y,Z,i] = comb(X, Z, i, m, g)
+        function [Y,Z,i] = comb(~, X, Z, i, m, g)
 
             % 変数の初期化
             nsample = length(X); % サンプル数
@@ -99,7 +99,7 @@ classdef Schroeders < audioPlugin
         end
         
         %% allpass filter
-        function [Y,Z,i] = allpass(X, Z, i, m, g)
+        function [Y,Z,i] = allpass(~, X, Z, i, m, g)
 
             % 変数の初期化
             nsample = length(X); % サンプル数
@@ -144,9 +144,9 @@ classdef Schroeders < audioPlugin
                 
                 % filter
                 [YL,p.combZ(i,:,1),p.combidx(i,1)] = ...
-                    comb(X(:,1),Z(:,1),idx(1),m(1),g(1));
+                    comb(p,X(:,1),Z(:,1),idx(1),m(1),g(1));
                 [YR,p.combZ(i,:,2),p.combidx(i,2)] = ...
-                    comb(X(:,2),Z(:,2),idx(2),m(2),g(2));
+                    comb(p,X(:,2),Z(:,2),idx(2),m(2),g(2));
                 
                 % sum
                 out = out+[YL,YR];
@@ -168,8 +168,8 @@ classdef Schroeders < audioPlugin
                 g   = 0.7;
                 
                 % filter
-                [YL,p.allZ(i,:,1),p.allidx(i,1)] = allpass(X(:,1),Z(:,1),idx(1),m,g);
-                [YR,p.allZ(i,:,2),p.allidx(i,2)] = allpass(X(:,2),Z(:,2),idx(2),m,g);
+                [YL,p.allZ(i,:,1),p.allidx(i,1)] = allpass(p,X(:,1),Z(:,1),idx(1),m,g);
+                [YR,p.allZ(i,:,2),p.allidx(i,2)] = allpass(p,X(:,2),Z(:,2),idx(2),m,g);
                 
                 X = [YL YR];
             end
