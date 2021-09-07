@@ -1,0 +1,3 @@
+classdef hardclipper < audioPlugin
+    
+end
