@@ -43,7 +43,8 @@ classdef Schroeders < audioPlugin
             audioPluginParameter('W','DisplayName','Width','Mapping',{'lin',0,1}),...
             audioPluginParameter('drymix','DisplayName','Dry','Mapping',{'lin',0,1}),...
             audioPluginParameter('wetmix','DisplayName','Wet','Mapping',{'lin',0,1}),...
-            audioPluginParameter('combN','DisplayName','Number of Comb Filters','Mapping',{'int',1,100})...
+            audioPluginParameter('combN','DisplayName','Number of Comb Filters','Mapping',{'int',1,100}),...
+            audioPluginParameter('seed','DisplayName','seed','Mapping',{'int',1,1000})...
             );
     end
 
@@ -57,6 +58,7 @@ classdef Schroeders < audioPlugin
             p.combidx = ones(p.combNmax);
             rng(p.seed);
             p.combm = floor((rand(p.combN)/2+1)*30*p.Fs/1000);
+            %1323～1984までの素数を適当に選んだ
 
             % allpassフィルタの初期化
             p.allZ = zeros(p.allL,p.allN);
@@ -65,9 +67,8 @@ classdef Schroeders < audioPlugin
         end
 
         function set.seed(p,seed)
-            p.seed = seed;            
+            p.s
         end
-                
         %% Filters
         function out = paraComb(p,in)            
             function [Y,Z,i] = comb(~, X, Z, i, m, g)
