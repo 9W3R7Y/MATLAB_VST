@@ -188,10 +188,10 @@ classdef Schroeders < audioPlugin
             YL = Y2(:,1);
             YR = Y2(:,2);
 
-            w = p.W/2+1/2;
+            theta = (p.W)*pi/4;
 
-            L = YL*w + YR*(1-w);
-            R = YR*w + YL*(1-w);
+            L = cos(theta)*YL + sin(theta)*YR;
+            R = cos(theta)*YR + sin(theta)*YL;
 
             % Mix
             dry = in;
