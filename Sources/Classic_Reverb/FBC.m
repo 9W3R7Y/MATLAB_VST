@@ -1,6 +1,7 @@
-function [Y,Z,i,varargout] = comb(~, X, Z, i, m, g, varargin)
+function [Y,Z,i,varargout] = FBC(~, X, Z, i, m, fy, fz, varargin)
+
     % 変数の初期化
-    nsample = length(X); % サンプル数
+    [nsample,~] = size(X); % サンプル数
     Y = zeros(size(X));  % 出力用の行列
     N = length(Z); % バッファの大きさ
 
@@ -10,11 +11,11 @@ function [Y,Z,i,varargout] = comb(~, X, Z, i, m, g, varargin)
         filtZ = NaN;
     else
         feedbackFilt = true;
-        g1 = g;
-        g2 = varargin{1};
-        filtZ = varargin{2};
+        g1 = varargin{1};
+        g2 = varargin{2};
+        filtZ = varargin{3};
     end
-        
+    
     % インデックスの変換
     ringInd = @(i) mod(i-1+N,N)+1;
 
@@ -22,26 +23,25 @@ function [Y,Z,i,varargout] = comb(~, X, Z, i, m, g, varargin)
     for j = 1:nsample
 
         % 入力
-        x = X(j,:);
+        x = X(j);
 
         % mサンプル前の値を取得
         z  = Z(ringInd(i-m),:);
 
         % 出力
-        y = z;
-        Y(j,:) = y(1); 
+        y = fy(x,z);
+        Y(j,:) = y; 
 
         % 入力のバッファへの格納とフィードバック
         if ~feedbackFilt
-            Z(ringInd(i),:) = x + g*z;
+            Z(ringInd(i),:) = fz(x,z);
         else
             [z,filtZ] = FOIIR([], z, filtZ, g1, g2);
-            Z(ringInd(i),:) = x+z;
+            Z(ringInd(i),:) = fz(x,z);
         end
 
         % バッファのインデックスを進める
         i = ringInd(i+1);
-        
     end
     
     varargout = {filtZ};
