@@ -67,7 +67,6 @@ classdef CR_Schroeders < audioPlugin
             
             p.combg = 10.^(-3*p.combm/p.Fs/p.T);
             [Y,p.combZ,p.combidx] = parallelComb(NaN, X, p.combN, p.combZ, p.combidx, p.combm, p.combg);
-            
             X = reshape(sum(Y,1),[L,1]);
             
             [Y,p.allZ, p.allidx] = seriesAllpass(NaN, X, p.allN, p.allZ, p.allidx, p.allm);

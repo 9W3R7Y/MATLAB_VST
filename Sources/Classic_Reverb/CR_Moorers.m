@@ -26,12 +26,14 @@ classdef CR_Moorers < audioPlugin
         
         LPZ;
         g1;
+        g2;
+        damp = 0;
 
         % サンプリング周波数
         Fs = 44100;
 
         % 残響時間のパラメタ
-        g = 1;
+        g = 0.5;
 
         % Dryの音量のパラメタ
         drymix = 1;
@@ -42,7 +44,8 @@ classdef CR_Moorers < audioPlugin
 
     properties (Constant)
         PluginInterface = audioPluginInterface(...
-            audioPluginParameter('g','DisplayName','Feedback','Mapping',{'pow',10,0,1}),...
+            audioPluginParameter('g','DisplayName','Feedback','Mapping',{'pow',1/10,0,1}),...
+            audioPluginParameter('damp','DisplayName','Damp','Mapping',{'lin',0,2}),...
             audioPluginParameter('drymix','DisplayName','Dry','Mapping',{'lin',0,1}),...
             audioPluginParameter('wetmix','DisplayName','Wet','Mapping',{'lin',0,1})...
             );
@@ -61,13 +64,13 @@ classdef CR_Moorers < audioPlugin
             
             % Monolize the input
             X = (in(:,1)+in(:,2))/2;
+            [L,~] = size(in);
             
-            g2  = p.g*(1-p.g1);
-            
-            [Y,p.combZ,p.combidx] = parallelComb(NaN, X, p.combN, p.combZ, p.combidx, p.combm, );
-            
-            X = Y;
-            
+            g1tuned = (p.g1).^(1/(p.damp+eps));
+            p.g2  = p.g*(1-g1tuned);
+            [Y,p.combZ,p.combidx,p.LPZ] = parallelComb(NaN, X, p.combN, p.combZ, p.combidx, p.combm, g1tuned, p.g2, p.LPZ);
+            X = reshape(sum(Y,1),[L,1]);
+           
             [Y,p.allZ, p.allidx] = seriesAllpass(NaN, X, p.allN, p.allZ, p.allidx, p.allm);
             
             % Mix
@@ -90,8 +93,9 @@ classdef CR_Moorers < audioPlugin
             p.allm = floor(6*p.Fs/1000);
             
             % LPFの初期化
-            p.LPZ = zeros(1,1);
+            p.LPZ = zeros(1,p.combN);
             p.g1  = [0.46, 0.48, 0.50, 0.52, 0.53, 0.55];
+            p.g2  = p.g*(1-p.g1);
         end
     end
 end
