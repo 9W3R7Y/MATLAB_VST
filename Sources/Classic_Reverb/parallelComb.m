@@ -1,4 +1,4 @@
-function [out,ZMat,idxMat, varargout] = parallelComb(~, X, N, ZMat, idxMat, mMat, gMat, varargin)
+function [out,ZMat,idxMat, varargout] = parallel(~, X, N, ZMat, idxMat, mMat, gMat, varargin)
 
     % 出力用変数の用意
     [L,nchannel] = size(X);

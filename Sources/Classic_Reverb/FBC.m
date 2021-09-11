@@ -37,7 +37,7 @@ function [Y,Z,i,varargout] = FBC(~, X, Z, i, m, fy, fz, varargin)
             Z(ringInd(i),:) = fz(x,z);
         else
             [z,filtZ] = FOIIR([], z, filtZ, g1, g2);
-            Z(ringInd(i),:) = fz(x,z);
+            Z(ringInd(i),:) = x + z;
         end
 
         % バッファのインデックスを進める

@@ -1,30 +1,25 @@
-function [Y,Z,i] = allpass(~, X, Z, i, m, g)
+function [Y,Z,i,varargout] = allpass(~, X, Z, i, m, g, varargin)
 
-    % 変数の初期化
-    [nsample,~] = size(X); % サンプル数
-    Y = zeros(size(X));  % 出力用の行列
-    N = length(Z); % バッファの大きさ
-
-    % インデックスの変換
-    ringInd = @(i) mod(i-1+N,N)+1;
-
-    % サンプル毎の処理
-    for j = 1:nsample
-
-        % 入力
-        x = X(j);
-
-        % mサンプル前の値を取得
-        z  = Z(ringInd(i-m),:);
-
-        % 出力
-        y = (1-g^2)*z - g*x;
-        Y(j,:) = y; 
-
-        % 入力のバッファへの格納とフィードバック
-        Z(ringInd(i),:) = x + g*z;
-
-        % バッファのインデックスを進める
-        i = ringInd(i+1);
+    % フィードバックの一次フィルタの有無
+    if isempty(varargin)
+        feedbackFilt = false;
+        filtZ = NaN;
+    else
+        feedbackFilt = true;
+        g1 = g;
+        g2 = varargin{1};
+        filtZ = varargin{2};
     end
+        
+    fy = @(x,z) (1-g^2)*z - g*x;
+    fz = @(x,z) x + g*z;
+    
+    if ~feedbackFilt
+        [Y,Z,i] = FBC([], X, Z, i, m, fy, fz);
+    else
+        [Y,Z,i,filtZ] = FBC([], X, Z, i, m, fy, fz, g1, g2, filtZ);
+    end
+        
+    varargout = {filtZ};
+
 end
