@@ -8,7 +8,7 @@ classdef Plug_PitchShifter < audioPlugin
         
         %% PitchShifting variables
         % Buffer Size
-        N = 2048;
+        N = 1024;
         
         % Loop Length
         L = 512;
@@ -17,11 +17,10 @@ classdef Plug_PitchShifter < audioPlugin
         BF
         
         % Reader Positions
-        pos1
-        pos2
+        reader_pos
         
         % Crossfade Coefficieant
-        cross_coeff = 1;
+        cross_coeff = 0.1;
         
         %% F0 Estimation variables
         
@@ -46,7 +45,8 @@ classdef Plug_PitchShifter < audioPlugin
         %% Visualization variables
         
         F0Buff;
-        FFTBuff;
+        OutBuff;
+        
         lastACF;
         lastLocsACF;
     end
@@ -68,15 +68,14 @@ classdef Plug_PitchShifter < audioPlugin
        function obj = Plug_PitchShifter()
             %% Initialize buffers with zeros
             obj.BF = Module_Buffer(obj.N,1);
-            obj.pos1 = obj.N/2;
-            obj.pos2 = (obj.N-obj.L)/2;
+            obj.reader_pos = obj.N/2;
             
             obj.LPBF = Module_Buffer(obj.N,1);
             obj.LPZ  = zeros(5,1);
             obj.LPCoeff = [1 1 1 1 1 -0.96]/6;
             
             obj.F0Buff = Module_Buffer(obj.N,1);
-            obj.FFTBuff = zeros(obj.N/2,1);
+            obj.OutBuff =Module_Buffer(obj.N,1);
        end
        
         %% Main Process
@@ -107,7 +106,6 @@ classdef Plug_PitchShifter < audioPlugin
                 obj.LPBF = obj.LPBF.put_sample(x_filted);
                 
                 %% Calc L
-                
                 if rem(obj.f0_count,obj.f0_duration) == 0
 
                     % calc Autocorrection Function
@@ -155,40 +153,36 @@ classdef Plug_PitchShifter < audioPlugin
                 step = 2^(obj.pitch/12) - 1;
                 
                 % step position
-                obj.pos1 = obj.pos1 + step;
-                obj.pos2 = obj.pos2 + step;
+                obj.reader_pos = obj.reader_pos + step;
                 
-                % looper
-                if obj.pos1 < bf_left
-                    obj.pos1 = obj.pos1 + obj.L;
-                elseif bf_right < obj.pos1
-                    obj.pos1 = obj.pos1 - obj.L;
-                end
-                
-                if obj.pos2 < bf_left
-                    obj.pos2 = obj.pos2 + obj.L;
-                elseif bf_right < obj.pos2
-                    obj.pos2 = obj.pos2 - obj.L;
+                % loop
+                if obj.reader_pos < bf_left
+                    obj.reader_pos = obj.reader_pos + obj.L;
+                elseif bf_right < obj.reader_pos
+                    obj.reader_pos = obj.reader_pos - obj.L;
                 end
                 
                 %% CrossFade
-                
+
                 % get sample from Buffer
-                y1 = obj.BF.get_sample(obj.pos1);
-                y2 = obj.BF.get_sample(obj.pos2);
-                
-                % crossfade func
+                y_R = obj.BF.get_sample(obj.reader_pos+obj.L);
+                y_C = obj.BF.get_sample(obj.reader_pos);
+                y_L = obj.BF.get_sample(obj.reader_pos-obj.L);
+
+                % calc mix rate
                 clip = @(x) min(1,max(0,x));
-                calc_d = @(pos) abs(pos-obj.N/2);
-                calc_a = @(pos) clip((calc_d(pos)-obj.L/4)...
-                                     /obj.cross_coeff+1/2);
-                % calc mix value
-                fade_mix = calc_a(obj.pos1);
+                faderange = obj.L*obj.cross_coeff;
+                mix_R = @(pos) 1-clip((pos-(obj.N-obj.L)/2)/faderange+1/2);
+                mix_L = @(pos) clip((pos-(obj.N+obj.L)/2)/faderange+1/2);
+                mix_C = @(pos) 1-max(mix_R(pos),mix_L(pos));
                 
-                y = y1;%fade_mix*y1 + (1-fade_mix)*y2;
+                y = y_L*mix_L(obj.reader_pos) + ...
+                    y_R*mix_R(obj.reader_pos) + ...
+                    y_C*mix_C(obj.reader_pos);
                 
                 %% Signal Output
                 out(i,:) = y;
+                obj.OutBuff = obj.OutBuff.put_sample(y);
             end
             
             out = [out, out];
@@ -196,32 +190,46 @@ classdef Plug_PitchShifter < audioPlugin
             %% Plot
             
             %%{
-            figure(1);
+            f = figure(1);
+            f.Visible = true;
             clf;
-            hold on;
 
             % Buffer
-            subplot(3,1,1);
-            plot(obj.LPBF.buff,'color','#999999');
-            fadecol1 = [1,fade_mix,fade_mix];
-            fadecol2 = [1-fade_mix,1-fade_mix,1];
-
-            xline(obj.pos1,'color',fadecol1);
-            xline(obj.pos2,'color',fadecol2);
-
+            subplot(2,2,1);
+            hold on;
+            plot(obj.BF.buff,'color','#888888');
+            plot(obj.reader_pos, y, 'o','color', 'r');
+            fadecol = [1,0,0];
+            xline(obj.reader_pos,'color',fadecol);
+            yline(y,':','color','r');
+            
             xline(bf_left);
             xline(bf_right);
+            
+            xlim([1 obj.N]);
+            ylim([-1 1]);
+            xticks([]);
+            
+            ylabel('Amplitude')
+            
+            title('Input Signal')
+            
+            % Output
+            subplot(2,2,2);
+            hold on;
+            plot(obj.OutBuff.buff,'color','#888888');
+            ylabel('Amplitude')
+            title('Output Signal')
+            plot(obj.N, y, 'o','color', 'r');
             
             xlim([-inf inf]);
             ylim([-1 1]);
             xticks([]);
             
-            ylabel('Amptitude')
+            yline(y,':','color','r');
             
-            title('Buffer')
-
             % Autocorrection Function
-            ax = subplot(3,1,2);
+            subplot(2,2,3);
             plot(obj.lastACF);
             hold on;
             
@@ -238,7 +246,7 @@ classdef Plug_PitchShifter < audioPlugin
             title('Autocorrection Function')
             
             % Pitch
-            subplot(3,1,3);
+            subplot(2,2,4);
             plot(obj.F0Buff.buff);
             xlim([-inf inf]);
             xticks([]);

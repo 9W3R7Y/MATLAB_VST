@@ -71,7 +71,7 @@ classdef Plug_SimplePitchShifter < audioPlugin
                 y = fade_coeff*y1 + (1-fade_coeff)*y2;
                     
                 % output
-                out(i,:) = y1;
+                out(i,:) = y;
             end
             
             out = [out, out];
