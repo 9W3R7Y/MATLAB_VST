@@ -41,9 +41,13 @@ classdef Plug_PitchShifter < audioPlugin
         LPCoeff_F0;
        
         %% Parameter
-        pitch = 0
+        pitch_shift = 0
         
         adaptive_loop_length = true
+        
+        autotune = true;
+        
+        frequency = 80;
         
         fmin = 100;
         fmax = 500;
@@ -60,15 +64,20 @@ classdef Plug_PitchShifter < audioPlugin
     %% User Interface
     properties (Constant)
         PluginInterface = audioPluginInterface(...
-            audioPluginParameter('pitch','DisplayName','Shift',...
+            audioPluginParameter('pitch_shift','DisplayName','Shift',...
                                  'Label','cent',...
                                  'Mapping',{'lin',-24,24}),...
             audioPluginParameter('adaptive_loop_length','DisplayName','Adaptive Loop Length',...
                                  'Mapping',{'enum','on','off'},...
                                  'Style','checkbox' ...
-                                 ));
+                                 ),...
+            audioPluginParameter('autotune','DisplayName','Autotune',...
+                                 'Mapping',{'enum','on','off'},...
+                                 'Style','checkbox'), ...
+            audioPluginParameter('frequency','DisplayName','Frequency',...
+                                 'Mapping',{'log',20,2000}) ...
+                                 );
     end
-    
     %% Methods
     methods
         %% Constructor
@@ -160,28 +169,46 @@ classdef Plug_PitchShifter < audioPlugin
                     obj.f0_count = 0;
                 end
                 
-                % save to buffer
+                % save to buffer (for visualization)
                 obj.F0Buff = obj.F0Buff.put_sample(obj.Fs/obj.T0);
                 
                 % update counter
                 obj.f0_count = obj.f0_count + 1;
 
                 %% Set loop length
-                
                 if obj.adaptive_loop_length
                     obj.L = obj.T0;
                 else
                     obj.L = 512;
                 end
                 
+                %% Calc Shift Amount
+                if obj.autotune
+                  %% Create Pitch List
+                    % major
+                    key_oct_map = [0 2 4 5 7 9 11];
+                    key_map = reshape(repmat(key_oct_map.',[1,5])+repmat(12*(0:4),[7,1]),1,[]);
+                    key_freq = obj.frequency;
+                    key_freq_map = key_freq*2.^(key_map/12);
+                    
+                  %% Find near key
+                    voice_freq = (obj.Fs/obj.T0);
+                    [~,nearkey_idx] = min(abs(log(key_freq_map/voice_freq)));
+                    target_freq = key_freq_map(nearkey_idx);
+                    
+                    rate = target_freq/voice_freq;
+                else
+                    rate = 2^(obj.pitch_shift/12);
+                end
+                
+                % calc step length
+                step = rate - 1;
+                
                 %% Update Readers
                
                 % set loop range
                 bf_left = (obj.N - obj.L)/2;
                 bf_right = bf_left + obj.L - 1;
-                
-                % calc step length
-                step = 2^(obj.pitch/12) - 1;
                 
                 % step position
                 obj.reader_pos = obj.reader_pos + step;
@@ -221,7 +248,7 @@ classdef Plug_PitchShifter < audioPlugin
             
             %% Plot
             
-            %%{
+            %{
             clf;
 
             % Buffer
