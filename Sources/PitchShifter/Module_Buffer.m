@@ -41,8 +41,8 @@ classdef Module_Buffer
             %   obj     ... Ringbuffer object.
             %   x       ... New Sample; 
             
-            obj.buff(1:end-1) = obj.buff(2:end);
-            obj.buff(end) = x;
+            obj.buff(1:end-1,:) = obj.buff(2:end,:);
+            obj.buff(end,:) = x;
         end
         
         function x = get_sample(obj,pos)

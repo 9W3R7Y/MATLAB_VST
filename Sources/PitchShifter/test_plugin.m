@@ -7,6 +7,9 @@ function [T, X, Y] = test_plugin(p, X, Fs, BFSIZE)
     % output matrix
     Y = zeros(size(X));
     
+    % wait bar
+    wb = waitbar(0,"processing...");
+    
     % main loop
     for i = 1:nloop
         % read buffer
@@ -16,8 +19,22 @@ function [T, X, Y] = test_plugin(p, X, Fs, BFSIZE)
         % process
         out = p.process(in);
         
+        % wait bar
+        waitbar(i/nloop,wb,"processing");
+        
         Y(idxs,:) = out;
     end
     
+    close(wb);
+    
     T = linspace(0,Fs*length(X),length(X));
+    
+    % Plot 
+    %{
+    figure();clf;
+    tiledlayout("flow");
+    nexttile;plot(T,X);title("Iput");
+    nexttile;plot(T,Y);title("Output");
+    xlim([-inf inf]);linkaxes;    
+    %}
 end

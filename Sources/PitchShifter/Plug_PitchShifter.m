@@ -8,7 +8,7 @@ classdef Plug_PitchShifter < audioPlugin
         
         %% PitchShifting variables
         % Buffer Size
-        N = 1024;
+        N = 2048;
         
         % Loop Length
         L = 512;
@@ -19,8 +19,8 @@ classdef Plug_PitchShifter < audioPlugin
         % Reader Positions
         reader_pos
         
-        % Crossfade Coefficieant
-        cross_coeff = 0.1;
+        % Crossfade Ratio
+        cross_rate = 0.1;
         
         %% F0 Estimation variables
         
@@ -29,18 +29,24 @@ classdef Plug_PitchShifter < audioPlugin
         LPZ
         LPCoeff
         
-        %%　
+        % T0
+        T0 = 512
+        
         % f0 duration
-        f0_duration = 128;
+        f0_duration = 512;
         f0_count = 0;
         
+        % f0 filter
+        LPZ_F0;
+        LPCoeff_F0;
+       
         %% Parameter
         pitch = 0
         
         adaptive_loop_length = true
         
         fmin = 100;
-        fmax = 1000;
+        fmax = 500;
         
         %% Visualization variables
         
@@ -48,7 +54,7 @@ classdef Plug_PitchShifter < audioPlugin
         OutBuff;
         
         lastACF;
-        lastLocsACF;
+        lastLocACF;
     end
     
     %% User Interface
@@ -63,20 +69,24 @@ classdef Plug_PitchShifter < audioPlugin
                                  ));
     end
     
-    %%
+    %% Methods
     methods
-       function obj = Plug_PitchShifter()
+        %% Constructor
+        function obj = Plug_PitchShifter()
             %% Initialize buffers with zeros
             obj.BF = Module_Buffer(obj.N,1);
             obj.reader_pos = obj.N/2;
-            
+
             obj.LPBF = Module_Buffer(obj.N,1);
-            obj.LPZ  = zeros(5,1);
-            obj.LPCoeff = [1 1 1 1 1 -0.96]/6;
-            
+
             obj.F0Buff = Module_Buffer(obj.N,1);
             obj.OutBuff =Module_Buffer(obj.N,1);
-       end
+            
+            %% Initialize Filters
+            obj.LPCoeff = [1 1 1 1 1 1 1 -0.96]/6;
+            obj.LPZ  = zeros(length(obj.LPCoeff)-1,1);
+            
+        end
        
         %% Main Process
         function out = process(obj, in)
@@ -105,45 +115,66 @@ classdef Plug_PitchShifter < audioPlugin
                 obj.BF = obj.BF.put_sample(x);
                 obj.LPBF = obj.LPBF.put_sample(x_filted);
                 
-                %% Calc L
+                %% f0 estimation
                 if rem(obj.f0_count,obj.f0_duration) == 0
 
-                    % calc Autocorrection Function
+                    % calc Autocorrelation Function
                     ACF = xcorr(obj.LPBF.buff.*blackman(obj.N));
                     ACF = ACF(floor(end/2):end);
                     ACF = ACF/ACF(1);
 
                     % find peaks
-                    [~,locsACF] = findpeaks(ACF,'MinPeakProminence',0.3);
-
-                    % 
-                    if ~isempty(locsACF)
-                        T0 = locsACF(1);
-                        obj.L = T0*2;
-                        obj.F0Buff = obj.F0Buff.put_sample(obj.Fs/T0);
-                    else
-                        obj.F0Buff = obj.F0Buff.put_sample(0);
-                    end
+                    [peaks,peakIdxs] = findpeaks(ACF,'MinPeakProminence',0.1);
                     
-                    % reset counter
-                    obj.f0_count = 0;
+                    % 
+                    if ~isempty(peaks)
+                        %% find peak
+                        
+                        % find maximum peak
+                        [~, Idx] = max(peaks);
+                        loc = peakIdxs(Idx);
+                        
+                        % temporary T0
+                        
+                        T0_tmp = loc;
+                        
+                       %% F0 Validation & Correction
+                        
+                        % if F0 is too high (ex.noise)
+                        % ...ignore & use old value
+                        if T0_tmp < obj.Fs/obj.fmax
+                            T0_tmp = obj.T0;
+                        end
+                        
+                        % Correct T0
+                        obj.T0 = T0_tmp;
+                    else
+                        loc = 1;
+                    end
                     
                     % save current ACF
                     obj.lastACF = ACF;
-                    obj.lastLocsACF = locsACF;
+                    obj.lastLocACF = loc;
                     
-                else
-                    obj.F0Buff = obj.F0Buff.put_sample(obj.Fs/obj.L*2);
+                    % reset counter
+                    obj.f0_count = 0;
                 end
                 
-                if ~obj.adaptive_loop_length
-                    obj.L = 512;
-                end
+                % save to buffer
+                obj.F0Buff = obj.F0Buff.put_sample(obj.Fs/obj.T0);
                 
                 % update counter
                 obj.f0_count = obj.f0_count + 1;
+
+                %% Set loop length
                 
-               %% Update Readers
+                if obj.adaptive_loop_length
+                    obj.L = obj.T0;
+                else
+                    obj.L = 512;
+                end
+                
+                %% Update Readers
                
                 % set loop range
                 bf_left = (obj.N - obj.L)/2;
@@ -171,7 +202,7 @@ classdef Plug_PitchShifter < audioPlugin
 
                 % calc mix rate
                 clip = @(x) min(1,max(0,x));
-                faderange = obj.L*obj.cross_coeff;
+                faderange = obj.L*obj.cross_rate;
                 mix_R = @(pos) 1-clip((pos-(obj.N-obj.L)/2)/faderange+1/2);
                 mix_L = @(pos) clip((pos-(obj.N+obj.L)/2)/faderange+1/2);
                 mix_C = @(pos) 1-max(mix_R(pos),mix_L(pos));
@@ -182,16 +213,15 @@ classdef Plug_PitchShifter < audioPlugin
                 
                 %% Signal Output
                 out(i,:) = y;
-                obj.OutBuff = obj.OutBuff.put_sample(y);
+                obj.OutBuff = obj.OutBuff.put_sample(y);              
             end
             
+            %% Modify output sig
             out = [out, out];
             
             %% Plot
             
             %%{
-            f = figure(1);
-            f.Visible = true;
             clf;
 
             % Buffer
@@ -228,22 +258,22 @@ classdef Plug_PitchShifter < audioPlugin
             
             yline(y,':','color','r');
             
-            % Autocorrection Function
+            % Autocorrelation Function
             subplot(2,2,3);
             plot(obj.lastACF);
             hold on;
             
-            if ~isempty(obj.lastLocsACF)
-                plot(obj.lastLocsACF(1),...
-                     obj.lastACF(obj.lastLocsACF(1)),'o');
+            if ~isempty(obj.lastLocACF)
+                plot(obj.lastLocACF,...
+                     obj.lastACF(obj.lastLocACF(1)),'o');
             end
             
             xlim([-inf inf]);ylim([-1 1]);
             xticks([]);
             
-            ylabel('Autocorrection')
+            ylabel('Autocorrelation')
             
-            title('Autocorrection Function')
+            title('Autocorrelation Function')
             
             % Pitch
             subplot(2,2,4);
