@@ -1,4 +1,4 @@
-classdef Plug_PitchShifter < audioPlugin
+classdef Plug_PitchShifter_Autotune < audioPlugin
     %#codegen
     properties
         %% Audio Setting
@@ -41,14 +41,30 @@ classdef Plug_PitchShifter < audioPlugin
         LPCoeff_F0;
        
         %% Parameter
+        
+        % shift amount
         pitch_shift = 0
         
-        adaptive_loop_length = true
-        
+        % autotune
         autotune = true;
         
-        frequency = 80;
+        % autotune key data
+        key = 'C';
+        key_list = {'C','C# / Db','D','D#','E','F',...
+                    'F#','G','G#','A','A#','B'}
+        key_pow  = [-9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2]
         
+        % autotune scale data
+        scale = 'Major'
+        scale_list = {'Root','Chromatic','Major','Minor'};
+        scale_pow  = {[0],...
+                      [0,1,2,3,4,5,6,7,8,9,10,11],...
+                      [0,2,4,5,7,9,11],...
+                      [0,2,3,5,7,8,10]};
+                  
+        % autotune depth
+        depth = 1;
+                  
         fmin = 100;
         fmax = 500;
         
@@ -67,21 +83,22 @@ classdef Plug_PitchShifter < audioPlugin
             audioPluginParameter('pitch_shift','DisplayName','Shift',...
                                  'Label','cent',...
                                  'Mapping',{'lin',-24,24}),...
-            audioPluginParameter('adaptive_loop_length','DisplayName','Adaptive Loop Length',...
-                                 'Mapping',{'enum','on','off'},...
-                                 'Style','checkbox' ...
-                                 ),...
             audioPluginParameter('autotune','DisplayName','Autotune',...
-                                 'Mapping',{'enum','on','off'},...
+                                 'Mapping',{'enum','off','on'},...
                                  'Style','checkbox'), ...
-            audioPluginParameter('frequency','DisplayName','Frequency',...
-                                 'Mapping',{'log',20,2000}) ...
+            audioPluginParameter('depth','DisplayName','Depth',...
+                                 'Mapping',{'lin',0,1}), ...
+            audioPluginParameter('key','DisplayName','Key',...
+                                 'Mapping',{'enum','C','C#','D','D#','E','F',...
+                                                   'F#','G','G#','A','A#','B'}),...
+            audioPluginParameter('scale','DisplayName','Key',...
+                                 'Mapping',{'enum','Root','Chromatic','Major','Minor'})...
                                  );
     end
     %% Methods
     methods
         %% Constructor
-        function obj = Plug_PitchShifter()
+        function obj = Plug_PitchShifter_Autotune()
             %% Initialize buffers with zeros
             obj.BF = Module_Buffer(obj.N,1);
             obj.reader_pos = obj.N/2;
@@ -137,7 +154,7 @@ classdef Plug_PitchShifter < audioPlugin
                     
                     % 
                     if ~isempty(peaks)
-                        %% find peak
+                     %% find peak
                         
                         % find maximum peak
                         [~, Idx] = max(peaks);
@@ -147,7 +164,7 @@ classdef Plug_PitchShifter < audioPlugin
                         
                         T0_tmp = loc;
                         
-                       %% F0 Validation & Correction
+                     %% F0 Validation & Correction
                         
                         % if F0 is too high (ex.noise)
                         % ...ignore & use old value
@@ -176,29 +193,38 @@ classdef Plug_PitchShifter < audioPlugin
                 obj.f0_count = obj.f0_count + 1;
 
                 %% Set loop length
-                if obj.adaptive_loop_length
-                    obj.L = obj.T0;
-                else
-                    obj.L = 512;
-                end
+                obj.L = obj.T0;
                 
                 %% Calc Shift Amount
+                
+                % pitch shift
+                rate = 2^(obj.pitch_shift/12);
+                
+                % autotune
                 if obj.autotune
-                  %% Create Pitch List
-                    % major
-                    key_oct_map = [0 2 4 5 7 9 11];
-                    key_map = reshape(repmat(key_oct_map.',[1,5])+repmat(12*(0:4),[7,1]),1,[]);
-                    key_freq = obj.frequency;
-                    key_freq_map = key_freq*2.^(key_map/12);
+                    % Create Scale Map
+                    scale_idx = find(strcmp(obj.scale,obj.scale_list));
+                    key_oct_map = obj.scale_pow{scale_idx};
+                    key_map = reshape(repmat(key_oct_map.',[1,7])+...
+                              repmat(12*(-3:3),[length(key_oct_map),1]),...
+                              1,[]);
                     
-                  %% Find near key
-                    voice_freq = (obj.Fs/obj.T0);
+                    % Get key index
+                    key_idx = find(strcmp(obj.key,obj.key_list));
+                    
+                    % Calc Root Freq
+                    rootfreq = 440*2.^(obj.key_pow(key_idx)/12);
+                    
+                    % Calc Freq Map
+                    key_freq_map = rootfreq*2.^(key_map/12);
+                    
+                    % Find near key
+                    voice_freq = (obj.Fs/obj.T0)*rate;
                     [~,nearkey_idx] = min(abs(log(key_freq_map/voice_freq)));
                     target_freq = key_freq_map(nearkey_idx);
                     
-                    rate = target_freq/voice_freq;
-                else
-                    rate = 2^(obj.pitch_shift/12);
+                    % Update Rate
+                    rate = rate*(target_freq/voice_freq).^obj.depth;
                 end
                 
                 % calc step length
@@ -248,7 +274,7 @@ classdef Plug_PitchShifter < audioPlugin
             
             %% Plot
             
-            %{
+            %%{
             clf;
 
             % Buffer
