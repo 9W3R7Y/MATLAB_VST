@@ -8,7 +8,7 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
         
         %% PitchShifting variables
         % Buffer Size
-        N = 2048;
+        N = 1024;
         
         % Loop Length
         L = 512;
@@ -33,7 +33,7 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
         T0 = 512
         
         % f0 duration
-        f0_duration = 512;
+        f0_duration = 1;
         f0_count = 0;
         
         % f0 filter
@@ -70,11 +70,11 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
         
         %% Visualization variables
         
-        F0Buff;
-        OutBuff;
+        %F0Buff;
+        %OutBuff;
         
-        lastACF;
-        lastLocACF;
+        %lastACF;
+        %lastLocACF;
     end
     
     %% User Interface
@@ -105,8 +105,9 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
 
             obj.LPBF = Module_Buffer(obj.N,1);
 
-            obj.F0Buff = Module_Buffer(obj.N,1);
-            obj.OutBuff =Module_Buffer(obj.N,1);
+            % visualization bariables
+            % obj.F0Buff = Module_Buffer(obj.N,1);
+            % obj.OutBuff =Module_Buffer(obj.N,1);
             
             %% Initialize Filters
             obj.LPCoeff = [1 1 1 1 1 1 1 -0.96]/6;
@@ -146,7 +147,7 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
 
                     % calc Autocorrelation Function
                     ACF = xcorr(obj.LPBF.buff.*blackman(obj.N));
-                    ACF = ACF(floor(end/2):end);
+                    ACF = ACF(floor(end/2):floor(end/4*3));
                     ACF = ACF/ACF(1);
 
                     % find peaks
@@ -178,16 +179,16 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
                         loc = 1;
                     end
                     
-                    % save current ACF
-                    obj.lastACF = ACF;
-                    obj.lastLocACF = loc;
+                    % save current ACF (for visualizaiton)
+                    % obj.lastACF = ACF;
+                    % obj.lastLocACF = loc;
                     
                     % reset counter
                     obj.f0_count = 0;
                 end
                 
                 % save to buffer (for visualization)
-                obj.F0Buff = obj.F0Buff.put_sample(obj.Fs/obj.T0);
+                % obj.F0Buff = obj.F0Buff.put_sample(obj.Fs/obj.T0);
                 
                 % update counter
                 obj.f0_count = obj.f0_count + 1;
@@ -266,7 +267,9 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
                 
                 %% Signal Output
                 out(i,:) = y;
-                obj.OutBuff = obj.OutBuff.put_sample(y);              
+                
+                % save for visualization
+                % obj.OutBuff = obj.OutBuff.put_sample(y);              
             end
             
             %% Modify output sig
@@ -274,7 +277,7 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
             
             %% Plot
             
-            %%{
+            %{
             clf;
 
             % Buffer
