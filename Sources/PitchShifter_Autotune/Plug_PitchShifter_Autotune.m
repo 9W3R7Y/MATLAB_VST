@@ -33,7 +33,7 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
         T0 = 512
         
         % f0 duration
-        f0_duration = 1;
+        f0_duration = 256;
         f0_count = 0;
         
         % f0 filter
@@ -43,7 +43,10 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
         %% Parameter
         
         % shift amount
-        pitch_shift = 0
+        pre_shift = 0
+        
+        % post shift
+        post_shift = 0
         
         % autotune
         autotune = true;
@@ -80,7 +83,7 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
     %% User Interface
     properties (Constant)
         PluginInterface = audioPluginInterface(...
-            audioPluginParameter('pitch_shift','DisplayName','Shift',...
+            audioPluginParameter('pre_shift','DisplayName','Pre Shift',...
                                  'Label','cent',...
                                  'Mapping',{'lin',-24,24}),...
             audioPluginParameter('autotune','DisplayName','Autotune',...
@@ -92,7 +95,10 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
                                  'Mapping',{'enum','C','C#','D','D#','E','F',...
                                                    'F#','G','G#','A','A#','B'}),...
             audioPluginParameter('scale','DisplayName','Key',...
-                                 'Mapping',{'enum','Root','Chromatic','Major','Minor'})...
+                                 'Mapping',{'enum','Root','Chromatic','Major','Minor'}),...
+            audioPluginParameter('post_shift','DisplayName','Post Shift',...
+                                 'Label','cent',...
+                                 'Mapping',{'lin',-24,24})...
                                  );
     end
     %% Methods
@@ -176,7 +182,7 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
                         % Correct T0
                         obj.T0 = T0_tmp;
                     else
-                        loc = 1;
+                        % loc = 1;
                     end
                     
                     % save current ACF (for visualizaiton)
@@ -198,8 +204,8 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
                 
                 %% Calc Shift Amount
                 
-                % pitch shift
-                rate = 2^(obj.pitch_shift/12);
+                % pre shift
+                rate = 2^(obj.pre_shift/12);
                 
                 % autotune
                 if obj.autotune
@@ -227,6 +233,9 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
                     % Update Rate
                     rate = rate*(target_freq/voice_freq).^obj.depth;
                 end
+                
+                % pre shift
+                rate = rate * 2^(obj.post_shift/12);
                 
                 % calc step length
                 step = rate - 1;
