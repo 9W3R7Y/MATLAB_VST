@@ -46,10 +46,6 @@ classdef Plug_SimplePitchShifter < audioPlugin
                 obj.RB1 = obj.RB1.put_sample(x);
                 obj.RB2 = obj.RB2.put_sample(x);
                 
-                % update RB
-                obj.RB1 = obj.RB1.update();
-                obj.RB2 = obj.RB2.update();
-                
                 % update pos
                 obj.pos = obj.pos + 2^(obj.pitch/12);
                 obj.pos = mod(obj.pos,obj.N);

@@ -44,11 +44,18 @@ classdef Module_Ringbuffer
             %   x       ... New Sample; 
             
             obj.buff(obj.i,:) = x;
+            obj.i = mod(obj.i,obj.N) + 1;
         end
         
-        function x = get_sample(obj,pos)
+        function x = get_sample(obj,pos,varargin)
             %GET_SAMPLE
             
+            if ~isempty(varargin) && varargin{1} == "local"
+                pos = pos+obj.i-1;
+            else % global
+                
+            end
+
             i1 = mod(floor(pos),obj.N)+1;
             i2 = mod(i1,obj.N)+1;
             a = rem(pos,1);
@@ -56,10 +63,12 @@ classdef Module_Ringbuffer
             x = (1-a)*obj.buff(i1,:) + a*obj.buff(i2,:);
         end
         
-        function obj = update(obj)
-            obj.i = mod(obj.i,obj.N) + 1;
+        function obj = rearrange(obj)
+            left = obj.buff(1:obj.i-1,:);
+            right = obj.buff(obj.i:end,:);
+            obj.buff = [right; left];
+            obj.i = 1;
         end
-        
     end
 end
 

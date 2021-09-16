@@ -33,7 +33,7 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
         T0 = 512
         
         % f0 duration
-        f0_duration = 256;
+        f0_duration = 128;
         f0_count = 0;
         
         % f0 filter
@@ -72,12 +72,13 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
         fmax = 500;
         
         %% Visualization variables
+        do_plot = false;
         
-        %F0Buff;
-        %OutBuff;
+        F0Buff;
+        OutBuff;
         
-        %lastACF;
-        %lastLocACF;
+        lastACF;
+        lastLocACF;
     end
     
     %% User Interface
@@ -106,14 +107,14 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
         %% Constructor
         function obj = Plug_PitchShifter_Autotune()
             %% Initialize buffers with zeros
-            obj.BF = Module_Buffer(obj.N,1);
+            obj.BF = Module_Ringbuffer(obj.N,1,1);
             obj.reader_pos = obj.N/2;
 
-            obj.LPBF = Module_Buffer(obj.N,1);
+            obj.LPBF = Module_Ringbuffer(obj.N,1,1);
 
             % visualization bariables
-            % obj.F0Buff = Module_Buffer(obj.N,1);
-            % obj.OutBuff =Module_Buffer(obj.N,1);
+            obj.F0Buff = Module_Buffer(obj.N,1);
+            obj.OutBuff =Module_Buffer(obj.N,1);
             
             %% Initialize Filters
             obj.LPCoeff = [1 1 1 1 1 1 1 -0.96]/6;
@@ -151,6 +152,8 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
                 %% f0 estimation
                 if rem(obj.f0_count,obj.f0_duration) == 0
 
+                    obj.LPBF = obj.LPBF.rearrange();
+                    
                     % calc Autocorrelation Function
                     ACF = xcorr(obj.LPBF.buff.*blackman(obj.N));
                     ACF = ACF(floor(end/2):floor(end/4*3));
@@ -182,19 +185,23 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
                         % Correct T0
                         obj.T0 = T0_tmp;
                     else
-                        % loc = 1;
+                        loc = 1;
                     end
                     
                     % save current ACF (for visualizaiton)
-                    % obj.lastACF = ACF;
-                    % obj.lastLocACF = loc;
+                    if obj.do_plot
+                        obj.lastACF = ACF;
+                        obj.lastLocACF = loc;
+                    end
                     
                     % reset counter
                     obj.f0_count = 0;
                 end
                 
                 % save to buffer (for visualization)
-                % obj.F0Buff = obj.F0Buff.put_sample(obj.Fs/obj.T0);
+                if obj.do_plot
+                    obj.F0Buff = obj.F0Buff.put_sample(obj.Fs/obj.T0);
+                end
                 
                 % update counter
                 obj.f0_count = obj.f0_count + 1;
@@ -259,9 +266,9 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
                 %% CrossFade
 
                 % get sample from Buffer
-                y_R = obj.BF.get_sample(obj.reader_pos+obj.L);
-                y_C = obj.BF.get_sample(obj.reader_pos);
-                y_L = obj.BF.get_sample(obj.reader_pos-obj.L);
+                y_R = obj.BF.get_sample(obj.reader_pos+obj.L,"local");
+                y_C = obj.BF.get_sample(obj.reader_pos,"local");
+                y_L = obj.BF.get_sample(obj.reader_pos-obj.L,"local");
 
                 % calc mix rate
                 clip = @(x) min(1,max(0,x));
@@ -278,7 +285,9 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
                 out(i,:) = y;
                 
                 % save for visualization
-                % obj.OutBuff = obj.OutBuff.put_sample(y);              
+                if obj.do_plot
+                    obj.OutBuff = obj.OutBuff.put_sample(y);
+                end
             end
             
             %% Modify output sig
@@ -287,71 +296,72 @@ classdef Plug_PitchShifter_Autotune < audioPlugin
             %% Plot
             
             %{
-            clf;
+            if obj.do_plot
+                clf;
 
-            % Buffer
-            subplot(2,2,1);
-            hold on;
-            plot(obj.BF.buff,'color','#888888');
-            plot(obj.reader_pos, y, 'o','color', 'r');
-            fadecol = [1,0,0];
-            xline(obj.reader_pos,'color',fadecol);
-            yline(y,':','color','r');
-            
-            xline(bf_left);
-            xline(bf_right);
-            
-            xlim([1 obj.N]);
-            ylim([-1 1]);
-            xticks([]);
-            
-            ylabel('Amplitude')
-            
-            title('Input Signal')
-            
-            % Output
-            subplot(2,2,2);
-            hold on;
-            plot(obj.OutBuff.buff,'color','#888888');
-            ylabel('Amplitude')
-            title('Output Signal')
-            plot(obj.N, y, 'o','color', 'r');
-            
-            xlim([-inf inf]);
-            ylim([-1 1]);
-            xticks([]);
-            
-            yline(y,':','color','r');
-            
-            % Autocorrelation Function
-            subplot(2,2,3);
-            plot(obj.lastACF);
-            hold on;
-            
-            if ~isempty(obj.lastLocACF)
-                plot(obj.lastLocACF,...
-                     obj.lastACF(obj.lastLocACF(1)),'o');
+                % Buffer
+                subplot(2,2,1);
+                hold on;
+                plot(obj.BF.buff,'color','#888888');
+                plot(obj.reader_pos, y, 'o','color', 'r');
+                fadecol = [1,0,0];
+                xline(obj.reader_pos,'color',fadecol);
+                yline(y,':','color','r');
+
+                xline(bf_left);
+                xline(bf_right);
+
+                xlim([1 obj.N]);
+                ylim([-1 1]);
+                xticks([]);
+
+                ylabel('Amplitude')
+
+                title('Input Signal')
+
+                % Output
+                subplot(2,2,2);
+                hold on;
+                plot(obj.OutBuff.buff,'color','#888888');
+                ylabel('Amplitude')
+                title('Output Signal')
+                plot(obj.N, y, 'o','color', 'r');
+
+                xlim([-inf inf]);
+                ylim([-1 1]);
+                xticks([]);
+
+                yline(y,':','color','r');
+
+                % Autocorrelation Function
+                subplot(2,2,3);
+                plot(obj.lastACF);
+                hold on;
+
+                if ~isempty(obj.lastLocACF)
+                    plot(obj.lastLocACF,...
+                         obj.lastACF(obj.lastLocACF(1)),'o');
+                end
+
+                xlim([-inf inf]);ylim([-1 1]);
+                xticks([]);
+
+                ylabel('Autocorrelation')
+
+                title('Autocorrelation Function')
+
+                % Pitch
+                subplot(2,2,4);
+                plot(obj.F0Buff.buff);
+                xlim([-inf inf]);
+                xticks([]);
+                ylim([0 1000]);
+
+                ylabel('Frequency [Hz]');
+                title('Pitch')
+
+                drawnow;
             end
-            
-            xlim([-inf inf]);ylim([-1 1]);
-            xticks([]);
-            
-            ylabel('Autocorrelation')
-            
-            title('Autocorrelation Function')
-            
-            % Pitch
-            subplot(2,2,4);
-            plot(obj.F0Buff.buff);
-            xlim([-inf inf]);
-            xticks([]);
-            ylim([0 1000]);
-
-            ylabel('Frequency [Hz]');
-            title('Pitch')
-            
-            drawnow;
-            
             %}
         end
     end
